@@ -7,6 +7,14 @@ export interface Surah {
   revelationType: string;
 }
 
+export interface Ayah {
+  number: number;
+  numberInSurah: number;
+  text: string;
+  audio: string;
+  translation: string;
+}
+
 export interface Doa {
   id: number;
   title: string;
@@ -28,5 +36,5 @@ export enum AppSection {
   TALAQQI = 'TALAQQI',
   DOA = 'DOA',
   QUIZ = 'QUIZ',
-  TUTOR = 'TUTOR'
+  STORIES = 'STORIES'
 }

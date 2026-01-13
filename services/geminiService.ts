@@ -1,7 +1,6 @@
 
 import { GoogleGenAI } from "@google/genai";
 
-// Always initialize with direct access to process.env.API_KEY as per guidelines.
 const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
 
 export const askIslamicTutor = async (question: string) => {
@@ -10,22 +9,22 @@ export const askIslamicTutor = async (question: string) => {
       model: 'gemini-3-flash-preview',
       contents: question,
       config: {
-        systemInstruction: `Anda adalah seorang guru mengaji (Ustadz/Ustadzah) yang sangat ramah dan ceria untuk anak-anak. 
-        Gunakan bahasa yang mudah dimengerti anak-anak (bahasa Indonesia). 
-        Berikan jawaban yang memotivasi mereka untuk belajar Al-Quran, Bahasa Arab, dan Adab. 
-        Gunakan emoji yang lucu. Jika ditanya tentang Surah di Juz 30, jelaskan intisari ceritanya dengan menarik.`,
-        temperature: 0.7,
+        systemInstruction: `Anda adalah "Kakak Pencerita" yang hebat, ramah, dan lucu untuk anak-anak muslim.
+        Tugas utama Anda adalah menceritakan Kisah Sahabat Nabi Muhammad SAW dengan cara yang sangat seru, mendebarkan, dan penuh hikmah.
+        Gunakan bahasa Indonesia yang ceria, mudah dimengerti (seperti mendongeng), dan banyak gunakan emoji yang lucu ✨🌟🛡️.
+        Selalu akhiri cerita dengan satu pesan kebaikan (moral) yang bisa ditiru anak-anak.
+        Jika ditanya di luar kisah sahabat, tetap jawab dengan nada seorang kakak yang membimbing dengan penuh kasih sayang.`,
+        temperature: 0.8,
       },
     });
-    // Correctly using .text property.
     return response.text;
   } catch (error) {
     console.error("Gemini API Error:", error);
-    return "Maaf ya sayang, Guru sedang beristirahat sebentar. Coba tanya lagi nanti ya! 😊";
+    return "Ups, Kakak sedang mencari buku cerita lainnya sebentar. Coba tanya lagi nanti ya, Adik manis! 😊📖";
   }
 };
 
 export const getSurahExplanation = async (surahName: string) => {
-  const prompt = `Ceritakan dengan singkat dan menarik untuk anak-anak tentang apa itu Surah ${surahName} dan kenapa kita harus membacanya.`;
+  const prompt = `Ceritakan dengan singkat dan sangat seru untuk anak-anak tentang apa pesan penting di dalam Surah ${surahName}.`;
   return askIslamicTutor(prompt);
 };

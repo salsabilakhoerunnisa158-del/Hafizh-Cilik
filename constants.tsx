@@ -1,7 +1,7 @@
 
 import React from 'react';
 import { Surah, Doa, QuizQuestion } from './types';
-import { BookOpen, Star, MessageSquare, PlayCircle, Award } from 'lucide-react';
+import { BookOpen, Star, PlayCircle, Award, BookOpenCheck } from 'lucide-react';
 
 export const JUZ_30_SURAHS: Surah[] = [
   { number: 78, name: "An-Naba'", englishName: "The Tidings", numberOfAyahs: 40, revelationType: "Meccan" },
@@ -72,8 +72,8 @@ export const ARABIC_QUIZZES: QuizQuestion[] = [
 ];
 
 export const NAV_ITEMS = [
-  { id: 'TALAQQI', label: 'Talaqqi', icon: <PlayCircle className="w-6 h-6" />, color: 'bg-emerald-500' },
-  { id: 'DOA', label: 'Doa Harian', icon: <Star className="w-6 h-6" />, color: 'bg-amber-500' },
-  { id: 'QUIZ', label: 'Kuis Arab', icon: <Award className="w-6 h-6" />, color: 'bg-indigo-500' },
-  { id: 'TUTOR', label: 'Tanya Guru', icon: <MessageSquare className="w-6 h-6" />, color: 'bg-rose-500' },
+  { id: 'TALAQQI', label: 'Talaqqi', icon: <PlayCircle className="w-8 h-8" />, color: 'bg-[#00D094]' }, // Vibrant Mint Green
+  { id: 'DOA', label: 'Doa Harian', icon: <Star className="w-8 h-8" />, color: 'bg-[#FFB100]' }, // Sunny Yellow
+  { id: 'QUIZ', label: 'Kuis Arab', icon: <Award className="w-8 h-8" />, color: 'bg-[#6B66FF]' }, // Playful Purple
+  { id: 'STORIES', label: 'Kisah Sahabat', icon: <BookOpenCheck className="w-8 h-8" />, color: 'bg-[#FF5D73]' }, // Cheerful Rose
 ];
