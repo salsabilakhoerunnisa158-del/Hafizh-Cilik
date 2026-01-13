@@ -1,13 +1,13 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import Layout from './components/Layout';
-import { AppSection, Surah, Doa, Ayah } from './types';
-import { JUZ_30_SURAHS, DAILY_DOAS, ARABIC_QUIZZES, NAV_ITEMS } from './constants';
-import { BookOpen, Star, Play, Pause, ChevronRight, SkipBack, SkipForward, Info, Award, MessageSquare, RotateCcw, ScrollText, Volume2, X, Music } from 'lucide-react';
+import { AppSection, Surah, Doa, Ayah, QuizQuestion, QuizTheme } from './types';
+import { JUZ_30_SURAHS, DAILY_DOAS, QUIZ_THEMES, NAV_ITEMS } from './constants';
+import { BookOpen, Star, Play, Pause, ChevronLeft, ChevronRight, SkipBack, SkipForward, Info, Award, MessageSquare, RotateCcw, ScrollText, Volume2, X, Music, Sparkles, Heart, CheckCircle2, AlertCircle, Sparkle, LayoutGrid, Volume1, Key } from 'lucide-react';
 import { askIslamicTutor, getSurahExplanation, generateDoaAudio } from './services/geminiService';
 import { fetchSurahDetails } from './services/quranService';
 
-const BASMALAH = "بِسْمِ اللَّهِ الرَّحْمَنِ الرَّحِيمِ";
+const BASMALAH = "بِسْم. اللَّهِ الرَّحْمَنِ الرَّحِيمِ";
 
 // Helper for Audio Decoding
 function decode(base64: string) {
@@ -48,14 +48,19 @@ const App: React.FC = () => {
   const [isAutoPlay, setIsAutoPlay] = useState(false);
   
   const [selectedDoa, setSelectedDoa] = useState<Doa | null>(null);
+  
+  const [selectedTheme, setSelectedTheme] = useState<QuizTheme | null>(null);
   const [quizIndex, setQuizIndex] = useState(0);
   const [score, setScore] = useState(0);
   const [showQuizResult, setShowQuizResult] = useState(false);
+  const [selectedAnswer, setSelectedAnswer] = useState<number | null>(null);
+  
   const [tutorQuestion, setTutorQuestion] = useState('');
   const [tutorAnswer, setTutorAnswer] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [surahWisdom, setSurahWisdom] = useState<string | null>(null);
   const [isAudioLoading, setIsAudioLoading] = useState(false);
+  const [apiError, setApiError] = useState<string | null>(null);
 
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const pcmAudioContextRef = useRef<AudioContext | null>(null);
@@ -73,20 +78,21 @@ const App: React.FC = () => {
 
   const loadSurah = async (number: number) => {
     setIsLoading(true);
-    const data = await fetchSurahDetails(number);
-    
-    if (number !== 1 && data.length > 0) {
-      const firstAyah = data[0];
-      if (firstAyah.text.startsWith(BASMALAH)) {
-        firstAyah.text = firstAyah.text.replace(BASMALAH, "").trim();
-      } else if (firstAyah.text.startsWith("بِسْمِ ٱللَّهِ ٱلرَّحْمَٰنِ ٱلرَّحِيمِ")) {
-          firstAyah.text = firstAyah.text.replace("بِسْمِ ٱللَّهِ ٱلرَّحْمَٰنِ ٱلرَّحِيمِ", "").trim();
+    try {
+      const data = await fetchSurahDetails(number);
+      if (number !== 1 && data.length > 0) {
+        const firstAyah = data[0];
+        if (firstAyah.text.startsWith(BASMALAH)) {
+          firstAyah.text = firstAyah.text.replace(BASMALAH, "").trim();
+        }
       }
+      setAyahs(data);
+      setCurrentAyahIndex(0);
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setIsLoading(false);
     }
-
-    setAyahs(data);
-    setIsLoading(false);
-    setCurrentAyahIndex(0);
   };
 
   const stopAudio = () => {
@@ -99,6 +105,47 @@ const App: React.FC = () => {
       pcmAudioContextRef.current = null;
     }
     setIsPlaying(false);
+  };
+
+  const handleOpenSelectKey = async () => {
+    if (window.aistudio?.openSelectKey) {
+      await window.aistudio.openSelectKey();
+      setApiError(null); // Clear error after key selection attempt
+    }
+  };
+
+  const playDoaAudio = async (text: string) => {
+    if (isPlaying) {
+      stopAudio();
+      return;
+    }
+    
+    setIsAudioLoading(true);
+    setApiError(null);
+    
+    try {
+      const base64Audio = await generateDoaAudio(text);
+      if (base64Audio) {
+        const ctx = new (window.AudioContext || (window as any).webkitAudioContext)({sampleRate: 24000});
+        pcmAudioContextRef.current = ctx;
+        const audioBuffer = await decodeAudioData(decode(base64Audio), ctx, 24000, 1);
+        const source = ctx.createBufferSource();
+        source.buffer = audioBuffer;
+        source.connect(ctx.destination);
+        setIsPlaying(true);
+        source.start();
+        source.onended = () => setIsPlaying(false);
+      }
+    } catch (error: any) {
+      console.error("Audio Play Error:", error);
+      if (error.message?.includes("429") || error.message?.includes("RESOURCE_EXHAUSTED")) {
+        setApiError("Kebutuhan suara lagi ramai banget nih! Adik bisa pakai kunci API sendiri supaya lancar terus.");
+      } else {
+        setApiError("Ups, ada sedikit gangguan audio. Coba lagi nanti ya!");
+      }
+    } finally {
+      setIsAudioLoading(false);
+    }
   };
 
   const playAyah = (index: number) => {
@@ -118,25 +165,6 @@ const App: React.FC = () => {
         playAyah(index + 1);
       }
     };
-  };
-
-  const playDoaAudio = async (doa: Doa) => {
-    stopAudio();
-    setIsAudioLoading(true);
-    const base64Audio = await generateDoaAudio(doa.arabic);
-    setIsAudioLoading(false);
-    
-    if (base64Audio) {
-      const ctx = new (window.AudioContext || (window as any).webkitAudioContext)({sampleRate: 24000});
-      pcmAudioContextRef.current = ctx;
-      const audioBuffer = await decodeAudioData(decode(base64Audio), ctx, 24000, 1);
-      const source = ctx.createBufferSource();
-      source.buffer = audioBuffer;
-      source.connect(ctx.destination);
-      setIsPlaying(true);
-      source.start();
-      source.onended = () => setIsPlaying(false);
-    }
   };
 
   const handlePreviousAyah = () => {
@@ -164,23 +192,61 @@ const App: React.FC = () => {
     setCurrentSection(section);
     setSelectedSurah(null);
     setSelectedDoa(null);
+    setSelectedTheme(null);
+    setSelectedAnswer(null);
+    setQuizIndex(0);
+    setApiError(null);
     stopAudio();
   };
 
   const handleAskTutor = async () => {
     if (!tutorQuestion.trim()) return;
     setIsLoading(true);
-    const answer = await askIslamicTutor(tutorQuestion);
-    setTutorAnswer(answer || '');
-    setIsLoading(false);
+    setApiError(null);
+    try {
+      const answer = await askIslamicTutor(tutorQuestion);
+      setTutorAnswer(answer || '');
+    } catch (e: any) {
+      if (e.message?.includes("429")) {
+        setApiError("Kakak lagi banyak tamu nih! Pakai kunci API adik sendiri yuk biar bisa cerita terus.");
+      }
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const handleFetchWisdom = async () => {
     if (!selectedSurah) return;
     setIsLoading(true);
-    const wisdom = await getSurahExplanation(selectedSurah.englishName);
-    setSurahWisdom(wisdom || null);
-    setIsLoading(false);
+    try {
+      const wisdom = await getSurahExplanation(selectedSurah.englishName);
+      setSurahWisdom(wisdom || null);
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleQuizAnswer = async (idx: number, currentQuiz: QuizQuestion) => {
+    if (!selectedTheme || selectedAnswer !== null) return;
+    
+    setSelectedAnswer(idx);
+    const isCorrect = idx === currentQuiz.answer;
+    
+    if (isCorrect) {
+      setScore(s => s + 10);
+      await playDoaAudio(currentQuiz.arabicWord);
+    }
+
+    setTimeout(() => {
+      setSelectedAnswer(null);
+      if (quizIndex < selectedTheme.questions.length - 1) {
+        setQuizIndex(q => q + 1);
+      } else {
+        setShowQuizResult(true);
+      }
+    }, 1500);
   };
 
   const renderHome = () => (
@@ -409,53 +475,92 @@ const App: React.FC = () => {
     if (selectedDoa) {
       return (
         <div className="space-y-6 animate-slideUp">
-          <div className="bg-white p-0 rounded-[45px] shadow-lg overflow-hidden border-b-8 border-amber-100">
+          <div className="bg-white p-0 rounded-[50px] shadow-2xl overflow-hidden border-b-[12px] border-amber-100 relative">
              {selectedDoa.imageUrl && (
-               <div className="h-56 relative overflow-hidden">
-                 <img src={selectedDoa.imageUrl} alt={selectedDoa.title} className="w-full h-full object-cover" />
-                 <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent flex items-end p-8">
-                    <h2 className="text-2xl font-black text-white">{selectedDoa.title}</h2>
+               <div className="h-80 relative overflow-hidden bg-[#FFF9EA]">
+                 <img 
+                   src={selectedDoa.imageUrl} 
+                   alt={selectedDoa.title} 
+                   className={`w-full h-full object-contain p-6 transform transition-all duration-700 ${isPlaying ? 'animate-gentlePulse scale-105' : 'hover:scale-105'}`} 
+                   onError={(e) => {
+                     (e.target as HTMLImageElement).src = 'https://www.svgrepo.com/show/396144/boy-in-bed.svg';
+                   }}
+                 />
+                 <div className="absolute inset-0 bg-gradient-to-t from-white via-transparent to-transparent"></div>
+                 <div className="absolute bottom-4 left-0 right-0 px-8 text-center">
+                    <div className="flex items-center gap-2 mb-1 justify-center">
+                      <Sparkles className="w-5 h-5 text-amber-500 animate-pulse" />
+                      <span className="text-[12px] text-amber-800 font-black uppercase tracking-widest">Waktunya Berdoa</span>
+                    </div>
+                    <h2 className="text-3xl font-black text-emerald-900 drop-shadow-sm">{selectedDoa.title}</h2>
                  </div>
                </div>
              )}
              
-             <div className="p-8 space-y-8 text-center">
-               <div className="flex justify-center">
+             <div className="p-8 pt-4 space-y-8 text-center">
+               <div className="flex justify-center items-center gap-4">
+                  <div className={`flex gap-1 items-end h-10 transition-opacity duration-300 ${isPlaying ? 'opacity-100' : 'opacity-0'}`}>
+                    {[0,1,2].map(i => <div key={i} className="w-2.5 rounded-full bg-emerald-400 animate-bounce" style={{height: `${40+Math.random()*60}%`, animationDelay: `${i*0.2}s`}}></div>)}
+                  </div>
+                  
                   <button 
-                    onClick={() => playDoaAudio(selectedDoa)}
+                    onClick={() => playDoaAudio(selectedDoa.arabic)}
                     disabled={isAudioLoading}
-                    className={`w-20 h-20 rounded-full flex items-center justify-center shadow-lg transition-all active:scale-95 ${isPlaying ? 'bg-amber-500 animate-pulse' : 'bg-emerald-500 hover:bg-emerald-600'}`}
+                    className={`w-32 h-32 rounded-[45px] flex items-center justify-center shadow-2xl transition-all active:scale-90 border-[8px] border-white relative group overflow-hidden ${isPlaying ? 'bg-rose-500 scale-110 shadow-rose-200' : 'bg-emerald-500 hover:bg-emerald-600 shadow-emerald-200'}`}
                   >
+                    <div className="absolute inset-0 bg-white/10 opacity-0 group-hover:opacity-100 transition-opacity"></div>
                     {isAudioLoading ? (
-                      <div className="w-8 h-8 border-4 border-white border-t-transparent rounded-full animate-spin"></div>
+                      <div className="w-14 h-14 border-[6px] border-white border-t-transparent rounded-full animate-spin"></div>
                     ) : isPlaying ? (
-                      <Pause className="w-10 h-10 text-white" />
+                      <Pause className="w-16 h-16 text-white fill-current" />
                     ) : (
-                      <Volume2 className="w-10 h-10 text-white" />
+                      <Volume2 className="w-16 h-16 text-white" />
                     )}
                   </button>
+
+                  <div className={`flex gap-1 items-end h-10 transition-opacity duration-300 ${isPlaying ? 'opacity-100' : 'opacity-0'}`}>
+                    {[0,1,2].map(i => <div key={i} className="w-2.5 rounded-full bg-emerald-400 animate-bounce" style={{height: `${40+Math.random()*60}%`, animationDelay: `${i*0.2}s`}}></div>)}
+                  </div>
                </div>
 
-               <p className="text-4xl font-arabic leading-relaxed text-emerald-950 text-right drop-shadow-sm">
-                 {selectedDoa.arabic}
-               </p>
-               
-               <div className="text-left bg-amber-50 p-5 rounded-[25px] border-2 border-amber-200/50 shadow-inner">
-                 <p className="text-[10px] font-black text-amber-700 uppercase tracking-widest mb-2">Cara Baca</p>
-                 <p className="italic text-sm text-amber-950 font-medium leading-relaxed">"{selectedDoa.transliteration}"</p>
+               {apiError && (
+                 <div className="bg-rose-50 p-4 rounded-2xl border-2 border-rose-100 text-rose-700 text-sm font-bold animate-fadeIn">
+                    <p className="mb-2">{apiError}</p>
+                    <button 
+                      onClick={handleOpenSelectKey}
+                      className="bg-rose-600 text-white px-4 py-2 rounded-xl text-xs flex items-center gap-2 mx-auto shadow-md"
+                    >
+                      <Key size={14} /> Atur Kunci API Sendiri
+                    </button>
+                 </div>
+               )}
+
+               <div className="bg-emerald-50/50 p-8 rounded-[45px] border-4 border-dashed border-emerald-100 shadow-inner">
+                <p className="text-4xl font-arabic leading-[1.8] text-emerald-950 text-right drop-shadow-sm">
+                  {selectedDoa.arabic}
+                </p>
                </div>
                
-               <div className="text-left bg-gray-50 p-5 rounded-[25px] border-2 border-gray-100">
-                 <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">Artinya</p>
-                 <p className="text-gray-700 text-[13px] leading-relaxed font-semibold">{selectedDoa.translation}</p>
+               <div className="text-left bg-amber-50 p-6 rounded-[35px] border-2 border-amber-200/50 shadow-inner">
+                 <p className="text-[10px] font-black text-amber-700 uppercase tracking-widest mb-2 flex items-center gap-2">
+                    <Music className="w-5 h-5" /> Cara Membaca
+                 </p>
+                 <p className="italic text-lg text-amber-950 font-bold leading-relaxed">"{selectedDoa.transliteration}"</p>
+               </div>
+               
+               <div className="text-left bg-indigo-50/50 p-6 rounded-[35px] border-2 border-indigo-100/50">
+                 <p className="text-[10px] font-black text-indigo-400 uppercase tracking-widest mb-2 flex items-center gap-2">
+                    <Heart className="w-5 h-5 fill-indigo-200" /> Artinya
+                 </p>
+                 <p className="text-indigo-900 text-[15px] leading-relaxed font-bold">{selectedDoa.translation}</p>
                </div>
              </div>
           </div>
           <button 
             onClick={() => { setSelectedDoa(null); stopAudio(); }}
-            className="w-full py-5 bg-amber-500 text-white rounded-[30px] font-black text-lg shadow-xl shadow-amber-200 active:scale-95 transition-all"
+            className="w-full py-6 bg-emerald-600 text-white rounded-[40px] font-black text-xl shadow-2xl shadow-emerald-200 active:scale-95 transition-all mb-10 flex items-center justify-center gap-3 border-b-8 border-emerald-800"
           >
-            Selesai Baca
+            Alhamdulillah, Hebat! <Sparkles className="w-7 h-7" />
           </button>
         </div>
       );
@@ -463,26 +568,41 @@ const App: React.FC = () => {
 
     return (
       <div className="space-y-4 animate-fadeIn">
-        <h3 className="px-2 text-amber-800 font-black text-lg">Koleksi Doa Harian</h3>
+        <h3 className="px-2 text-amber-800 font-black text-xl flex items-center gap-2">
+          Hafalan Doa Harian <Star className="w-6 h-6 fill-amber-400 text-amber-400" />
+        </h3>
         <div className="grid grid-cols-1 gap-4">
             {DAILY_DOAS.map((doa) => (
             <button
                 key={doa.id}
                 onClick={() => setSelectedDoa(doa)}
-                className="bg-white p-3 rounded-[35px] shadow-sm border-2 border-amber-50 flex items-center gap-5 group active:scale-[0.98] transition-all hover:bg-amber-50/50 overflow-hidden"
+                className="bg-white p-4 rounded-[40px] shadow-sm border-2 border-amber-50 flex items-center gap-6 group active:scale-[0.98] transition-all hover:bg-amber-50/50 overflow-hidden"
             >
-                <div className="w-20 h-20 rounded-3xl overflow-hidden shadow-md flex-shrink-0">
-                  <img src={doa.imageUrl} alt={doa.title} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500" />
+                <div className="w-28 h-28 rounded-[35px] overflow-hidden shadow-md flex-shrink-0 border-4 border-white bg-amber-50 relative">
+                  <img 
+                    src={doa.imageUrl} 
+                    alt={doa.title} 
+                    className="w-full h-full object-contain p-2 group-hover:scale-110 transition-transform duration-500" 
+                    onError={(e) => {
+                      (e.target as HTMLImageElement).src = 'https://www.svgrepo.com/show/396144/boy-in-bed.svg';
+                    }}
+                  />
+                  <div className="absolute inset-0 bg-gradient-to-t from-amber-500/10 to-transparent"></div>
                 </div>
                 <div className="flex-1 text-left">
-                  <span className="font-black text-gray-800 text-lg block">{doa.title}</span>
-                  <span className="text-[10px] font-bold text-amber-600 uppercase tracking-widest flex items-center gap-1 mt-1">
-                    <Music className="w-3 h-3" /> Audio Tersedia
-                  </span>
+                  <span className="font-black text-gray-800 text-xl block group-hover:text-amber-600 transition-colors mb-1">{doa.title}</span>
+                  <div className="flex flex-wrap gap-2">
+                    <span className="bg-emerald-50 text-emerald-600 text-[9px] font-black px-3 py-1 rounded-full uppercase tracking-widest flex items-center gap-1 shadow-sm">
+                      <Volume2 size={12} /> Audio Jernih
+                    </span>
+                    <span className="bg-amber-50 text-amber-600 text-[9px] font-black px-3 py-1 rounded-full uppercase tracking-widest shadow-sm">
+                      Kartun Seru ✨
+                    </span>
+                  </div>
                 </div>
-                <div className="pr-4">
-                  <div className="w-10 h-10 bg-amber-100 rounded-full flex items-center justify-center text-amber-600 group-hover:bg-amber-500 group-hover:text-white transition-all">
-                    <ChevronRight className="w-6 h-6" />
+                <div className="pr-2">
+                  <div className="w-12 h-12 bg-amber-100 rounded-[20px] flex items-center justify-center text-amber-600 group-hover:bg-amber-500 group-hover:text-white transition-all shadow-sm">
+                    <ChevronRight className="w-7 h-7" />
                   </div>
                 </div>
             </button>
@@ -493,6 +613,48 @@ const App: React.FC = () => {
   };
 
   const renderQuiz = () => {
+    if (!selectedTheme) {
+      return (
+        <div className="space-y-6 animate-fadeIn">
+          <div className="bg-indigo-600 p-8 rounded-[45px] text-white shadow-xl relative overflow-hidden">
+             <div className="absolute -top-10 -right-10 w-40 h-40 bg-white/10 rounded-full"></div>
+             <h2 className="text-3xl font-black mb-2">Pilih Tema Seru! 🧩</h2>
+             <p className="opacity-80 font-bold">Ayo tebak kosa kata bahasa Arab!</p>
+          </div>
+
+          <div className="grid grid-cols-1 gap-4">
+            {QUIZ_THEMES.map((theme) => (
+              <button
+                key={theme.id}
+                onClick={() => {
+                  setSelectedTheme(theme);
+                  setQuizIndex(0);
+                  setScore(0);
+                  setShowQuizResult(false);
+                  setApiError(null);
+                }}
+                className="bg-white p-6 rounded-[35px] shadow-lg border-2 border-gray-50 flex items-center gap-6 group hover:border-indigo-400 transition-all active:scale-[0.98]"
+              >
+                <div className={`w-20 h-20 ${theme.color} rounded-[28px] flex items-center justify-center text-4xl shadow-md group-hover:scale-110 transition-transform`}>
+                   {theme.icon}
+                </div>
+                <div className="flex-1 text-left">
+                   <h3 className="text-xl font-black text-gray-800 mb-1">{theme.title}</h3>
+                   <div className="flex items-center gap-2">
+                      <span className="bg-indigo-50 text-indigo-600 text-[10px] font-black px-3 py-1 rounded-full uppercase tracking-widest">10 Soal</span>
+                      <span className="bg-amber-50 text-amber-600 text-[10px] font-black px-3 py-1 rounded-full uppercase tracking-widest">Audio ✨</span>
+                   </div>
+                </div>
+                <div className="w-12 h-12 bg-gray-50 rounded-2xl flex items-center justify-center text-gray-300 group-hover:bg-indigo-500 group-hover:text-white transition-all">
+                   <ChevronRight />
+                </div>
+              </button>
+            ))}
+          </div>
+        </div>
+      );
+    }
+
     if (showQuizResult) {
       return (
         <div className="bg-white p-10 rounded-[50px] shadow-2xl text-center animate-bounceIn border-b-[12px] border-indigo-100">
@@ -501,54 +663,150 @@ const App: React.FC = () => {
             <div className="absolute top-0 right-0 w-10 h-10 bg-yellow-400 rounded-full flex items-center justify-center font-bold text-white shadow-lg animate-pulse">✨</div>
           </div>
           <h2 className="text-4xl font-black text-gray-800 mb-2">WOW HEBAT! 🎈</h2>
-          <p className="text-gray-400 font-bold mb-10">Skor Petualangmu:</p>
+          <p className="text-gray-400 font-bold mb-4">Petualangan {selectedTheme.title} Selesai!</p>
           <div className="inline-block px-10 py-5 bg-indigo-600 text-white rounded-[30px] shadow-xl shadow-indigo-200 mb-10">
               <span className="text-6xl font-black">{score}</span>
               <span className="text-xl font-bold opacity-70 ml-2">Poin</span>
           </div>
-          <button 
-            onClick={() => {
-              setQuizIndex(0);
-              setScore(0);
-              setShowQuizResult(false);
-            }}
-            className="w-full py-5 bg-indigo-100 text-indigo-700 rounded-[30px] font-black text-xl hover:bg-indigo-600 hover:text-white transition-all shadow-md active:scale-95"
-          >
-            Main Lagi Yuk!
-          </button>
+          <div className="grid grid-cols-1 gap-4">
+            <button 
+              onClick={() => {
+                setQuizIndex(0);
+                setScore(0);
+                setShowQuizResult(false);
+                setApiError(null);
+              }}
+              className="w-full py-5 bg-indigo-600 text-white rounded-[30px] font-black text-xl hover:bg-indigo-700 transition-all shadow-lg active:scale-95"
+            >
+              Coba Lagi Yuk!
+            </button>
+            <button 
+              onClick={() => handleNavigate(AppSection.QUIZ)}
+              className="w-full py-5 bg-gray-100 text-gray-600 rounded-[30px] font-black text-xl hover:bg-gray-200 transition-all active:scale-95 flex items-center justify-center gap-2"
+            >
+              <LayoutGrid size={24} /> Pilih Tema Lain
+            </button>
+          </div>
         </div>
       );
     }
 
-    const currentQuiz = ARABIC_QUIZZES[quizIndex];
+    const currentQuiz = selectedTheme.questions[quizIndex];
 
     return (
-      <div className="space-y-6 animate-fadeIn">
-        <div className="flex justify-between items-center text-xs font-black text-indigo-300 px-4">
-          <span className="bg-indigo-50 px-3 py-1 rounded-full uppercase tracking-widest">Tantangan Pintar</span>
-          <span className="text-lg">{quizIndex + 1} <span className="text-gray-200">/</span> {ARABIC_QUIZZES.length}</span>
+      <div className="space-y-6 animate-fadeIn pb-10">
+        <div className="flex justify-between items-center text-xs font-black text-indigo-400 px-4">
+          <button 
+            onClick={() => setSelectedTheme(null)}
+            className="bg-indigo-50 px-3 py-1 rounded-full uppercase tracking-widest flex items-center gap-1 hover:bg-indigo-100 transition-colors"
+          >
+             <ChevronLeft size={14} /> Kembali
+          </button>
+          <div className="flex items-center gap-4">
+            <span className="bg-indigo-50 px-3 py-1 rounded-full uppercase tracking-widest">{selectedTheme.title}</span>
+            <span className="text-lg font-black">{quizIndex + 1} <span className="text-indigo-100">/</span> {selectedTheme.questions.length}</span>
+          </div>
         </div>
-        <div className="bg-white p-10 rounded-[45px] shadow-lg border-2 border-indigo-50 min-h-[160px] flex items-center justify-center text-center relative overflow-hidden">
-            <div className="absolute top-2 left-4 text-indigo-100 opacity-20"><Award size={120} /></div>
-            <h2 className="text-2xl font-black text-gray-800 leading-relaxed relative z-10">{currentQuiz.question}</h2>
+
+        <div className="bg-white p-6 rounded-[55px] shadow-2xl border-4 border-white text-center relative overflow-hidden group">
+            {currentQuiz.imageUrl && (
+              <div className={`w-full h-56 sm:h-72 mb-6 rounded-[45px] overflow-hidden bg-white border-2 border-indigo-50 shadow-inner relative flex items-center justify-center p-6 transition-all duration-300 ${selectedAnswer !== null && selectedAnswer === currentQuiz.answer ? 'ring-8 ring-emerald-100' : ''}`}>
+                <img 
+                  src={currentQuiz.imageUrl} 
+                  alt="Kuis Gambar" 
+                  className={`max-w-full max-h-full object-contain transition-all duration-700 ${isPlaying ? 'animate-gentlePulse scale-110' : ''}`} 
+                  onError={(e) => {
+                    (e.target as HTMLImageElement).src = "https://www.svgrepo.com/show/406691/lion.svg";
+                  }}
+                />
+                {isPlaying && (
+                   <div className="absolute inset-0 flex items-center justify-center bg-indigo-500/10 backdrop-blur-[1px] animate-fadeIn">
+                      <Volume2 className="w-16 h-16 text-indigo-600 animate-pulse" />
+                   </div>
+                )}
+              </div>
+            )}
+            
+            {/* Speaker Button ALWAYS VISIBLE below image */}
+            <div className="flex justify-center mb-6">
+              <button 
+                onClick={() => playDoaAudio(currentQuiz.arabicWord)}
+                disabled={isAudioLoading}
+                className={`flex items-center gap-3 px-10 py-4 rounded-full font-black text-sm transition-all active:scale-90 shadow-xl border-b-4 ${isPlaying ? 'bg-indigo-600 text-white border-indigo-800 animate-pulse' : 'bg-white text-indigo-600 border-indigo-100 hover:bg-indigo-50'}`}
+              >
+                {isAudioLoading ? (
+                  <div className="w-5 h-5 border-2 border-indigo-600 border-t-transparent rounded-full animate-spin"></div>
+                ) : (
+                  <Volume2 size={24} />
+                )}
+                DENGERIN SUARANYA
+              </button>
+            </div>
+
+            {apiError && (
+              <div className="mb-6 bg-rose-50 p-4 rounded-3xl border-2 border-rose-100 text-rose-700 text-xs font-black animate-fadeIn">
+                 <p className="mb-2">{apiError}</p>
+                 <button 
+                    onClick={handleOpenSelectKey}
+                    className="bg-rose-600 text-white px-5 py-2 rounded-2xl flex items-center gap-2 mx-auto active:scale-95 transition-all shadow-md"
+                 >
+                    <Key size={14} /> Atur Kunci API
+                 </button>
+              </div>
+            )}
+
+            <h2 className="text-[22px] sm:text-[26px] font-black text-indigo-950 leading-tight drop-shadow-sm mb-4">
+              {currentQuiz.question}
+            </h2>
+
+            {selectedAnswer !== null && (
+               <div className={`py-4 px-6 rounded-3xl font-black text-center mb-4 animate-bounceIn shadow-sm border-2 ${selectedAnswer === currentQuiz.answer ? 'bg-emerald-50 text-emerald-600 border-emerald-200' : 'bg-rose-50 text-rose-600 border-rose-200'}`}>
+                  {selectedAnswer === currentQuiz.answer ? (
+                    <div className="flex flex-col items-center gap-1">
+                       <span className="text-4xl font-arabic">{currentQuiz.arabicWord}</span>
+                       <span className="text-[10px] uppercase tracking-[0.2em] font-black">Masya Allah! Jawabanmu Benar ✨</span>
+                    </div>
+                  ) : "Ups, Jawaban Kurang Tepat 😿"}
+               </div>
+            )}
         </div>
-        <div className="grid grid-cols-1 gap-4">
-          {currentQuiz.options.map((opt, idx) => (
-            <button
-              key={idx}
-              onClick={() => {
-                if (idx === currentQuiz.answer) setScore(s => s + 10);
-                if (quizIndex < ARABIC_QUIZZES.length - 1) {
-                  setQuizIndex(q => q + 1);
-                } else {
-                  setShowQuizResult(true);
-                }
-              }}
-              className="w-full p-6 bg-white rounded-[30px] border-4 border-transparent hover:border-indigo-400 text-center font-black text-xl text-gray-700 active:bg-indigo-50 transition-all shadow-lg shadow-indigo-900/5 group"
-            >
-              {opt}
-            </button>
-          ))}
+
+        <div className="grid grid-cols-1 gap-4 px-2">
+          {currentQuiz.options.map((opt, idx) => {
+            const isSelected = selectedAnswer === idx;
+            const isCorrect = idx === currentQuiz.answer;
+            
+            let buttonClass = "bg-white border-b-8 border-gray-100 text-gray-800 hover:border-indigo-400";
+            if (isSelected) {
+              buttonClass = isCorrect 
+                ? "bg-emerald-500 border-emerald-700 text-white scale-105" 
+                : "bg-rose-500 border-rose-700 text-white scale-95";
+            } else if (selectedAnswer !== null && isCorrect) {
+              buttonClass = "bg-emerald-50 border-emerald-200 text-emerald-700 opacity-60";
+            }
+
+            return (
+              <button
+                key={idx}
+                disabled={selectedAnswer !== null}
+                onClick={() => handleQuizAnswer(idx, currentQuiz)}
+                className={`w-full p-6 sm:p-8 rounded-[40px] text-center font-black text-[20px] sm:text-[22px] transition-all shadow-xl active:translate-y-1 active:border-b-0 group relative overflow-hidden ${buttonClass}`}
+              >
+                <span className="relative z-10">{opt}</span>
+                {isSelected && isCorrect && <Sparkles className="absolute top-2 right-4 w-10 h-10 text-white/30 animate-pulse" />}
+              </button>
+            );
+          })}
+        </div>
+
+        <div className="mt-8 bg-gradient-to-r from-indigo-600 to-indigo-500 p-6 rounded-[40px] flex items-center gap-4 shadow-lg shadow-indigo-200 border-2 border-white">
+            <div className="bg-white/20 p-3 rounded-2xl text-white animate-bounce">
+                <Music size={24} />
+            </div>
+            <p className="text-[12px] sm:text-sm font-black text-white leading-relaxed tracking-wide">
+               Ingat gambar dan dengar suaranya!<br/>
+               <span className="opacity-80 font-bold uppercase text-[10px]">Ayo kumpulkan bintang juara! 🌟</span>
+            </p>
         </div>
       </div>
     );
@@ -594,6 +852,17 @@ const App: React.FC = () => {
             <span className="text-xs font-black text-rose-800 ml-2">Kakak sedang buka buku...</span>
           </div>
         )}
+        {apiError && (
+          <div className="bg-rose-50 p-6 rounded-[35px] border-2 border-rose-100 text-rose-700 font-bold text-sm animate-fadeIn">
+             <p className="mb-4 text-center">{apiError}</p>
+             <button 
+                onClick={handleOpenSelectKey}
+                className="w-full bg-rose-600 text-white py-3 rounded-2xl flex items-center justify-center gap-2 active:scale-95 transition-all shadow-lg"
+             >
+                <Key size={18} /> Pakai Kunci API Sendiri
+             </button>
+          </div>
+        )}
       </div>
 
       <div className="sticky bottom-0 bg-white p-5 rounded-t-[45px] shadow-[0_-20px_40px_rgba(255,93,115,0.08)] space-y-4">
@@ -623,7 +892,7 @@ const App: React.FC = () => {
       case AppSection.HOME: return "Hafiz Cilik";
       case AppSection.TALAQQI: return selectedSurah ? selectedSurah.name : "Belajar Hafalan";
       case AppSection.DOA: return selectedDoa ? "Baca Doa" : "Doa Harian";
-      case AppSection.QUIZ: return "Kuis Seru";
+      case AppSection.QUIZ: return selectedTheme ? `Kuis ${selectedTheme.title}` : "Kuis Seru";
       case AppSection.STORIES: return "Kisah Sahabat";
       default: return "Hafiz Cilik";
     }

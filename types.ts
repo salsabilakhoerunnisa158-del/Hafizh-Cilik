@@ -30,6 +30,16 @@ export interface QuizQuestion {
   options: string[];
   answer: number;
   explanation: string;
+  imageUrl?: string;
+  arabicWord: string;
+}
+
+export interface QuizTheme {
+  id: string;
+  title: string;
+  icon: string;
+  color: string;
+  questions: QuizQuestion[];
 }
 
 export enum AppSection {
