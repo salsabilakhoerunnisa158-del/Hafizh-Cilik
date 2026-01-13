@@ -1,0 +1,7 @@
+{
+  "name": "Hafiz Cilik: Juz 30 & Doa",
+  "description": "A fun and interactive Islamic learning app for children to practice Juz 30 memorization, daily prayers, and Arabic language skills with AI-powered tutoring.",
+  "requestFramePermissions": [
+    "microphone"
+  ]
+}
