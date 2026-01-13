@@ -1,5 +1,5 @@
 
-import { GoogleGenAI } from "@google/genai";
+import { GoogleGenAI, Modality } from "@google/genai";
 
 const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
 
@@ -10,10 +10,9 @@ export const askIslamicTutor = async (question: string) => {
       contents: question,
       config: {
         systemInstruction: `Anda adalah "Kakak Pencerita" yang hebat, ramah, dan lucu untuk anak-anak muslim.
-        Tugas utama Anda adalah menceritakan Kisah Sahabat Nabi Muhammad SAW dengan cara yang sangat seru, mendebarkan, dan penuh hikmah.
+        Tugas utama Anda adalah menceritakan Kisah Sahabat Nabi Muhammad SAW atau memberikan penjelasan tentang Al-Quran dengan cara yang sangat seru dan penuh hikmah.
         Gunakan bahasa Indonesia yang ceria, mudah dimengerti (seperti mendongeng), dan banyak gunakan emoji yang lucu ✨🌟🛡️.
-        Selalu akhiri cerita dengan satu pesan kebaikan (moral) yang bisa ditiru anak-anak.
-        Jika ditanya di luar kisah sahabat, tetap jawab dengan nada seorang kakak yang membimbing dengan penuh kasih sayang.`,
+        Selalu berikan pesan kebaikan (moral) yang konkret dan bisa ditiru anak-anak dalam kehidupan sehari-hari.`,
         temperature: 0.8,
       },
     });
@@ -25,6 +24,27 @@ export const askIslamicTutor = async (question: string) => {
 };
 
 export const getSurahExplanation = async (surahName: string) => {
-  const prompt = `Ceritakan dengan singkat dan sangat seru untuk anak-anak tentang apa pesan penting di dalam Surah ${surahName}.`;
+  const prompt = `Berikan "Pesan & Hikmah" yang sangat seru dan menyentuh hati dari Surah ${surahName} khusus untuk anak-anak. Jelaskan apa yang Allah ingin kita lakukan setelah membaca surah ini. Gunakan banyak emoji.`;
   return askIslamicTutor(prompt);
+};
+
+export const generateDoaAudio = async (text: string) => {
+  try {
+    const response = await ai.models.generateContent({
+      model: "gemini-2.5-flash-preview-tts",
+      contents: [{ parts: [{ text: `Bacakan doa berikut dengan perlahan dan jelas untuk anak-anak: ${text}` }] }],
+      config: {
+        responseModalities: [Modality.AUDIO],
+        speechConfig: {
+          voiceConfig: {
+            prebuiltVoiceConfig: { voiceName: 'Kore' }, // Kore is usually a friendly child-appropriate voice
+          },
+        },
+      },
+    });
+    return response.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data;
+  } catch (error) {
+    console.error("TTS Error:", error);
+    return null;
+  }
 };

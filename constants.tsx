@@ -26,24 +26,91 @@ export const JUZ_30_SURAHS: Surah[] = [
 export const DAILY_DOAS: Doa[] = [
   {
     id: 1,
-    title: "Doa Sebelum Makan",
-    arabic: "اللَّهُمَّ بَارِكْ لَنَا فِيمَا رَزَقْتَنَا وَقِنَا عَذَابَ النَّارِ",
-    transliteration: "Allahumma baarik lanaa fiimaa razaqtanaa wa qinaa 'adzaaban naar",
-    translation: "Ya Allah, berkahilah rezeki yang Engkau berikan kepada kami dan jauhkanlah kami dari siksa api neraka."
+    title: "Bangun Tidur",
+    arabic: "الْحَمْدُ لِلَّهِ الَّذِي أَحْيَانَا بَعْدَ مَا أَمَاتَنَا وَإِلَيْهِ النُّشُورُ",
+    transliteration: "Alhamdu lillahil-ladhi ahyana ba'da ma amatana wa ilayhin-nushur",
+    translation: "Segala puji bagi Allah yang menghidupkan kami setelah mematikan kami dan kepada-Nya kami kembali.",
+    imageUrl: "https://images.unsplash.com/photo-1541480601022-2308c0f02487?auto=format&fit=crop&q=80&w=400"
   },
   {
     id: 2,
-    title: "Doa Sebelum Tidur",
+    title: "Sebelum Tidur",
     arabic: "بِاسْمِكَ اللَّهُمَّ أَحْيَا وَأَمُوتُ",
     transliteration: "Bismika Allahumma ahyaa wa amuutu",
-    translation: "Dengan nama-Mu ya Allah aku hidup dan aku mati."
+    translation: "Dengan nama-Mu ya Allah aku hidup dan aku mati.",
+    imageUrl: "https://images.unsplash.com/photo-1520206153919-5ee71bc86934?auto=format&fit=crop&q=80&w=400"
   },
   {
     id: 3,
-    title: "Doa Untuk Orang Tua",
+    title: "Keluar Rumah",
+    arabic: "بِسْمِ اللَّهِ تَوَكَّلْتُ عَلَى اللَّهِ لَا حَوْلَ وَلَا قُوَّةَ إِلَّا بِاللَّهِ",
+    transliteration: "Bismillahi tawakkaltu 'alallah, laa hawla walaa quwwata illa billah",
+    translation: "Dengan nama Allah, aku bertawakal kepada Allah. Tidak ada daya dan kekuatan kecuali dengan pertolongan Allah.",
+    imageUrl: "https://images.unsplash.com/photo-1513694203232-719a280e022f?auto=format&fit=crop&q=80&w=400"
+  },
+  {
+    id: 4,
+    title: "Masuk Rumah",
+    arabic: "بِسْمِ اللهِ وَلَجْنَا، وَبِسْمِ اللهِ خَرَجْنَا، وَعَلَى اللهِ رَبِّنَا تَوَكَّلْنَا",
+    transliteration: "Bismillahi walajnaa, wa bismillahi kharajnaa, wa 'alallahi rabbinaa tawakkalnaa",
+    translation: "Dengan nama Allah kami masuk, dengan nama Allah kami keluar, dan kepada Allah Tuhan kami, kami bertawakal.",
+    imageUrl: "https://images.unsplash.com/photo-1484154218962-a197022b5858?auto=format&fit=crop&q=80&w=400"
+  },
+  {
+    id: 5,
+    title: "Masuk Masjid",
+    arabic: "اللَّهُمَّ افْتَحْ لِي أَبْوَابَ رَحْمَتِكَ",
+    transliteration: "Allahummaf-tah lii abwaaba rahmatik",
+    translation: "Ya Allah, bukakanlah bagiku pintu-pintu rahmat-Mu.",
+    imageUrl: "https://images.unsplash.com/photo-1564121211835-e88c852648ab?auto=format&fit=crop&q=80&w=400"
+  },
+  {
+    id: 6,
+    title: "Keluar Masjid",
+    arabic: "اللَّهُمَّ إِنِّي أَسْأَلُكَ مِنْ فَضْلِكَ",
+    transliteration: "Allahumma innii as'aluka min fadhlik",
+    translation: "Ya Allah, aku memohon kepada-Mu akan limpahan karunia-Mu.",
+    imageUrl: "https://images.unsplash.com/photo-1542810634-71277d95dcbb?auto=format&fit=crop&q=80&w=400"
+  },
+  {
+    id: 7,
+    title: "Masuk WC",
+    arabic: "اللَّهُمَّ إِنِّي أَعُوذُ بِكَ مِنَ الْخُبُثِ وَالْخَبَائِثِ",
+    transliteration: "Allahumma innii a'uudzu bika minal khubutsi wal khabaa'its",
+    translation: "Ya Allah, aku berlindung kepada-Mu dari godaan setan laki-laki dan setan perempuan.",
+    imageUrl: "https://images.unsplash.com/photo-1584622650111-993a426fbf0a?auto=format&fit=crop&q=80&w=400"
+  },
+  {
+    id: 8,
+    title: "Keluar WC",
+    arabic: "غُفْرَانَكَ",
+    transliteration: "Ghufranak",
+    translation: "Aku memohon ampunan-Mu.",
+    imageUrl: "https://images.unsplash.com/photo-1563298723-dcfebaa392e3?auto=format&fit=crop&q=80&w=400"
+  },
+  {
+    id: 9,
+    title: "Memakai Baju",
+    arabic: "الْحَمْدُ لِلَّهِ الَّذِي كَسَانِي هَذَا وَرَزَقَنِيهِ مِنْ غَيْرِ حَوْلٍ مِنِّي وَلَا قُوَّةٍ",
+    transliteration: "Alhamdu lillahil-ladhi kasani hadha wa razaqanihi min ghayri hawlin minni wala quwwah",
+    translation: "Segala puji bagi Allah yang telah memakaikan pakaian ini kepadaku dan memberikan rezeki kepadaku tanpa daya dan kekuatan dariku.",
+    imageUrl: "https://images.unsplash.com/photo-1512436991641-6745cdb1723f?auto=format&fit=crop&q=80&w=400"
+  },
+  {
+    id: 10,
+    title: "Sebelum Makan",
+    arabic: "اللَّهُمَّ بَارِكْ لَنَا فِيمَا رَزَقْتَنَا وَقِنَا عَذَابَ النَّارِ",
+    transliteration: "Allahumma baarik lanaa fiimaa razaqtanaa wa qinaa 'adzaaban naar",
+    translation: "Ya Allah, berkahilah rezeki yang Engkau berikan kepada kami dan jauhkanlah kami dari siksa api neraka.",
+    imageUrl: "https://images.unsplash.com/photo-1547592166-23ac45744acd?auto=format&fit=crop&q=80&w=400"
+  },
+  {
+    id: 11,
+    title: "Orang Tua",
     arabic: "رَبِّ اغْفِرْ لِي وَلِوَالِدَيَّ وَارْحَمْهُمَا كَمَا رَبَّيَانِي صَغِيرًا",
     transliteration: "Rabbighfir lii waliwaalidayya warhamhumaa kamaa rabbayaanii shaghiiraa",
-    translation: "Ya Tuhanku, ampunilah dosaku dan dosa kedua orang tuaku, dan sayangilah mereka sebagaimana mereka menyayangiku di waktu kecil."
+    translation: "Ya Tuhanku, ampunilah dosaku dan dosa kedua orang tuaku, dan sayangilah mereka sebagaimana mereka menyayangiku di waktu kecil.",
+    imageUrl: "https://images.unsplash.com/photo-1491438590914-bc09fcaaf77a?auto=format&fit=crop&q=80&w=400"
   }
 ];
 

@@ -3,11 +3,41 @@ import React, { useState, useEffect, useRef } from 'react';
 import Layout from './components/Layout';
 import { AppSection, Surah, Doa, Ayah } from './types';
 import { JUZ_30_SURAHS, DAILY_DOAS, ARABIC_QUIZZES, NAV_ITEMS } from './constants';
-import { BookOpen, Star, Play, Pause, ChevronRight, Volume2, Info, Award, MessageSquare, RotateCcw, ScrollText } from 'lucide-react';
-import { askIslamicTutor, getSurahExplanation } from './services/geminiService';
+import { BookOpen, Star, Play, Pause, ChevronRight, SkipBack, SkipForward, Info, Award, MessageSquare, RotateCcw, ScrollText, Volume2, X, Music } from 'lucide-react';
+import { askIslamicTutor, getSurahExplanation, generateDoaAudio } from './services/geminiService';
 import { fetchSurahDetails } from './services/quranService';
 
 const BASMALAH = "بِسْمِ اللَّهِ الرَّحْمَنِ الرَّحِيمِ";
+
+// Helper for Audio Decoding
+function decode(base64: string) {
+  const binaryString = atob(base64);
+  const len = binaryString.length;
+  const bytes = new Uint8Array(len);
+  for (let i = 0; i < len; i++) {
+    bytes[i] = binaryString.charCodeAt(i);
+  }
+  return bytes;
+}
+
+async function decodeAudioData(
+  data: Uint8Array,
+  ctx: AudioContext,
+  sampleRate: number,
+  numChannels: number,
+): Promise<AudioBuffer> {
+  const dataInt16 = new Int16Array(data.buffer);
+  const frameCount = dataInt16.length / numChannels;
+  const buffer = ctx.createBuffer(numChannels, frameCount, sampleRate);
+
+  for (let channel = 0; channel < numChannels; channel++) {
+    const channelData = buffer.getChannelData(channel);
+    for (let i = 0; i < frameCount; i++) {
+      channelData[i] = dataInt16[i * numChannels + channel] / 32768.0;
+    }
+  }
+  return buffer;
+}
 
 const App: React.FC = () => {
   const [currentSection, setCurrentSection] = useState<AppSection>(AppSection.HOME);
@@ -24,15 +54,20 @@ const App: React.FC = () => {
   const [tutorQuestion, setTutorQuestion] = useState('');
   const [tutorAnswer, setTutorAnswer] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [surahWisdom, setSurahWisdom] = useState<string | null>(null);
+  const [isAudioLoading, setIsAudioLoading] = useState(false);
 
   const audioRef = useRef<HTMLAudioElement | null>(null);
+  const pcmAudioContextRef = useRef<AudioContext | null>(null);
 
   useEffect(() => {
     if (selectedSurah) {
       loadSurah(selectedSurah.number);
+      setSurahWisdom(null);
     } else {
       stopAudio();
       setAyahs([]);
+      setSurahWisdom(null);
     }
   }, [selectedSurah]);
 
@@ -40,13 +75,11 @@ const App: React.FC = () => {
     setIsLoading(true);
     const data = await fetchSurahDetails(number);
     
-    // Process first ayah: remove basmalah prefix if it exists (for surahs other than Fatiha #1)
     if (number !== 1 && data.length > 0) {
       const firstAyah = data[0];
       if (firstAyah.text.startsWith(BASMALAH)) {
         firstAyah.text = firstAyah.text.replace(BASMALAH, "").trim();
       } else if (firstAyah.text.startsWith("بِسْمِ ٱللَّهِ ٱلرَّحْمَٰنِ ٱلرَّحِيمِ")) {
-          // Sometimes API uses slightly different characters
           firstAyah.text = firstAyah.text.replace("بِسْمِ ٱللَّهِ ٱلرَّحْمَٰنِ ٱلرَّحِيمِ", "").trim();
       }
     }
@@ -60,6 +93,10 @@ const App: React.FC = () => {
     if (audioRef.current) {
       audioRef.current.pause();
       audioRef.current = null;
+    }
+    if (pcmAudioContextRef.current) {
+      pcmAudioContextRef.current.close();
+      pcmAudioContextRef.current = null;
     }
     setIsPlaying(false);
   };
@@ -83,6 +120,37 @@ const App: React.FC = () => {
     };
   };
 
+  const playDoaAudio = async (doa: Doa) => {
+    stopAudio();
+    setIsAudioLoading(true);
+    const base64Audio = await generateDoaAudio(doa.arabic);
+    setIsAudioLoading(false);
+    
+    if (base64Audio) {
+      const ctx = new (window.AudioContext || (window as any).webkitAudioContext)({sampleRate: 24000});
+      pcmAudioContextRef.current = ctx;
+      const audioBuffer = await decodeAudioData(decode(base64Audio), ctx, 24000, 1);
+      const source = ctx.createBufferSource();
+      source.buffer = audioBuffer;
+      source.connect(ctx.destination);
+      setIsPlaying(true);
+      source.start();
+      source.onended = () => setIsPlaying(false);
+    }
+  };
+
+  const handlePreviousAyah = () => {
+    if (currentAyahIndex > 0) {
+      playAyah(currentAyahIndex - 1);
+    }
+  };
+
+  const handleNextAyah = () => {
+    if (currentAyahIndex < ayahs.length - 1) {
+      playAyah(currentAyahIndex + 1);
+    }
+  };
+
   const toggleAutoPlay = () => {
     if (isPlaying) {
       stopAudio();
@@ -104,6 +172,14 @@ const App: React.FC = () => {
     setIsLoading(true);
     const answer = await askIslamicTutor(tutorQuestion);
     setTutorAnswer(answer || '');
+    setIsLoading(false);
+  };
+
+  const handleFetchWisdom = async () => {
+    if (!selectedSurah) return;
+    setIsLoading(true);
+    const wisdom = await getSurahExplanation(selectedSurah.englishName);
+    setSurahWisdom(wisdom || null);
     setIsLoading(false);
   };
 
@@ -169,10 +245,12 @@ const App: React.FC = () => {
 
           <div className="flex justify-center items-center gap-6">
             <button 
-              onClick={() => { setCurrentAyahIndex(0); stopAudio(); }}
-              className="bg-white text-gray-400 w-14 h-14 rounded-3xl flex items-center justify-center shadow-md active:scale-90 transition-all border border-gray-100"
+              onClick={handlePreviousAyah}
+              disabled={currentAyahIndex <= 0}
+              className="bg-white text-emerald-500 disabled:text-gray-200 w-14 h-14 rounded-3xl flex items-center justify-center shadow-md active:scale-90 transition-all border border-gray-100"
+              title="Ayat Sebelumnya"
             >
-              <RotateCcw className="w-6 h-6" />
+              <SkipBack className="w-7 h-7 fill-current" />
             </button>
             <button 
               onClick={toggleAutoPlay}
@@ -180,8 +258,13 @@ const App: React.FC = () => {
             >
               {isPlaying ? <Pause className="w-12 h-12" /> : <Play className="w-12 h-12 ml-2" />}
             </button>
-            <button className="bg-white text-emerald-500 w-14 h-14 rounded-3xl flex items-center justify-center shadow-md active:scale-90 transition-all border border-gray-100">
-              <Volume2 className="w-7 h-7" />
+            <button 
+              onClick={handleNextAyah}
+              disabled={currentAyahIndex >= ayahs.length - 1}
+              className="bg-white text-emerald-500 disabled:text-gray-200 w-14 h-14 rounded-3xl flex items-center justify-center shadow-md active:scale-90 transition-all border border-gray-100"
+              title="Ayat Berikutnya"
+            >
+              <SkipForward className="w-7 h-7 fill-current" />
             </button>
           </div>
 
@@ -200,14 +283,13 @@ const App: React.FC = () => {
             </div>
             
             <div className="space-y-4 max-h-[450px] overflow-y-auto px-1 custom-scrollbar">
-              {isLoading ? (
+              {isLoading && !surahWisdom ? (
                 <div className="py-24 text-center">
                     <div className="w-10 h-10 border-4 border-emerald-200 border-t-emerald-500 rounded-full animate-spin mx-auto mb-4"></div>
                     <p className="text-gray-400 font-bold text-sm">Membuka lembaran indah...</p>
                 </div>
               ) : ayahs.length > 0 ? (
                 <>
-                  {/* Separate Basmalah Header */}
                   {selectedSurah.number !== 1 && (
                     <div className="text-center py-6 bg-emerald-50/50 rounded-[30px] border-2 border-dashed border-emerald-100 mb-6">
                         <p className="text-3xl font-arabic text-emerald-950">{BASMALAH}</p>
@@ -255,18 +337,43 @@ const App: React.FC = () => {
             
             <div className="mt-8 pt-5 border-t border-gray-100">
                <button 
-                 onClick={async () => {
-                   setIsLoading(true);
-                   const explanation = await getSurahExplanation(selectedSurah.englishName);
-                   alert(explanation);
-                   setIsLoading(false);
-                 }}
+                 onClick={handleFetchWisdom}
                  className="flex items-center gap-3 py-3 px-6 bg-emerald-50 text-emerald-700 font-black text-xs rounded-2xl mx-auto shadow-sm active:scale-95 transition-all"
                >
-                 <Info className="w-4 h-4" /> MAKNA SURAH INI
+                 <Info className="w-4 h-4" /> PESAN & HIKMAH SURAH INI
                </button>
             </div>
           </div>
+
+          {surahWisdom && (
+            <div className="fixed inset-0 z-[60] bg-black/40 backdrop-blur-sm flex items-end justify-center p-4 animate-fadeIn">
+                <div className="bg-white w-full max-w-md rounded-[45px] p-8 shadow-2xl border-t-8 border-emerald-400 animate-slideUp relative">
+                    <button 
+                      onClick={() => setSurahWisdom(null)}
+                      className="absolute top-6 right-6 bg-gray-100 p-2 rounded-full text-gray-400 hover:text-rose-500 transition-colors"
+                    >
+                        <X size={20} />
+                    </button>
+                    <div className="flex items-center gap-4 mb-6">
+                        <div className="bg-emerald-100 p-4 rounded-3xl text-emerald-600">
+                            <Star className="fill-current" />
+                        </div>
+                        <h3 className="text-xl font-black text-emerald-900">Pesan & Hikmah</h3>
+                    </div>
+                    <div className="max-h-[60vh] overflow-y-auto custom-scrollbar pr-2">
+                        <p className="text-gray-700 leading-relaxed font-medium whitespace-pre-wrap">
+                            {surahWisdom}
+                        </p>
+                    </div>
+                    <button 
+                        onClick={() => setSurahWisdom(null)}
+                        className="w-full mt-8 py-4 bg-emerald-600 text-white rounded-[25px] font-black shadow-lg shadow-emerald-200 active:scale-95 transition-all"
+                    >
+                        Masya Allah, Hebat!
+                    </button>
+                </div>
+            </div>
+          )}
         </div>
       );
     }
@@ -302,19 +409,42 @@ const App: React.FC = () => {
     if (selectedDoa) {
       return (
         <div className="space-y-6 animate-slideUp">
-          <div className="bg-white p-8 rounded-[45px] shadow-lg text-center border-b-8 border-amber-100">
-             <div className="w-16 h-16 bg-amber-50 rounded-2xl flex items-center justify-center mx-auto mb-6">
-                <Star className="w-10 h-10 fill-amber-400 text-amber-400" />
-             </div>
-             <h2 className="text-2xl font-black text-amber-900 mb-8">{selectedDoa.title}</h2>
-             <div className="space-y-8">
+          <div className="bg-white p-0 rounded-[45px] shadow-lg overflow-hidden border-b-8 border-amber-100">
+             {selectedDoa.imageUrl && (
+               <div className="h-56 relative overflow-hidden">
+                 <img src={selectedDoa.imageUrl} alt={selectedDoa.title} className="w-full h-full object-cover" />
+                 <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent flex items-end p-8">
+                    <h2 className="text-2xl font-black text-white">{selectedDoa.title}</h2>
+                 </div>
+               </div>
+             )}
+             
+             <div className="p-8 space-y-8 text-center">
+               <div className="flex justify-center">
+                  <button 
+                    onClick={() => playDoaAudio(selectedDoa)}
+                    disabled={isAudioLoading}
+                    className={`w-20 h-20 rounded-full flex items-center justify-center shadow-lg transition-all active:scale-95 ${isPlaying ? 'bg-amber-500 animate-pulse' : 'bg-emerald-500 hover:bg-emerald-600'}`}
+                  >
+                    {isAudioLoading ? (
+                      <div className="w-8 h-8 border-4 border-white border-t-transparent rounded-full animate-spin"></div>
+                    ) : isPlaying ? (
+                      <Pause className="w-10 h-10 text-white" />
+                    ) : (
+                      <Volume2 className="w-10 h-10 text-white" />
+                    )}
+                  </button>
+               </div>
+
                <p className="text-4xl font-arabic leading-relaxed text-emerald-950 text-right drop-shadow-sm">
                  {selectedDoa.arabic}
                </p>
+               
                <div className="text-left bg-amber-50 p-5 rounded-[25px] border-2 border-amber-200/50 shadow-inner">
                  <p className="text-[10px] font-black text-amber-700 uppercase tracking-widest mb-2">Cara Baca</p>
                  <p className="italic text-sm text-amber-950 font-medium leading-relaxed">"{selectedDoa.transliteration}"</p>
                </div>
+               
                <div className="text-left bg-gray-50 p-5 rounded-[25px] border-2 border-gray-100">
                  <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">Artinya</p>
                  <p className="text-gray-700 text-[13px] leading-relaxed font-semibold">{selectedDoa.translation}</p>
@@ -322,7 +452,7 @@ const App: React.FC = () => {
              </div>
           </div>
           <button 
-            onClick={() => setSelectedDoa(null)}
+            onClick={() => { setSelectedDoa(null); stopAudio(); }}
             className="w-full py-5 bg-amber-500 text-white rounded-[30px] font-black text-lg shadow-xl shadow-amber-200 active:scale-95 transition-all"
           >
             Selesai Baca
@@ -333,21 +463,28 @@ const App: React.FC = () => {
 
     return (
       <div className="space-y-4 animate-fadeIn">
-        <h3 className="px-2 text-amber-800 font-black text-lg">Hafalan Doa</h3>
+        <h3 className="px-2 text-amber-800 font-black text-lg">Koleksi Doa Harian</h3>
         <div className="grid grid-cols-1 gap-4">
             {DAILY_DOAS.map((doa) => (
             <button
                 key={doa.id}
                 onClick={() => setSelectedDoa(doa)}
-                className="bg-white p-6 rounded-[35px] shadow-sm border-2 border-amber-50 flex items-center justify-between group active:scale-[0.98] transition-all hover:bg-amber-50"
+                className="bg-white p-3 rounded-[35px] shadow-sm border-2 border-amber-50 flex items-center gap-5 group active:scale-[0.98] transition-all hover:bg-amber-50/50 overflow-hidden"
             >
-                <div className="flex items-center gap-5">
-                <div className="w-14 h-14 bg-amber-100 rounded-[22px] flex items-center justify-center text-amber-600 shadow-inner group-hover:scale-110 transition-transform">
-                    <Star className="w-8 h-8 fill-amber-400" />
+                <div className="w-20 h-20 rounded-3xl overflow-hidden shadow-md flex-shrink-0">
+                  <img src={doa.imageUrl} alt={doa.title} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500" />
                 </div>
-                <span className="font-black text-gray-800 text-lg">{doa.title}</span>
+                <div className="flex-1 text-left">
+                  <span className="font-black text-gray-800 text-lg block">{doa.title}</span>
+                  <span className="text-[10px] font-bold text-amber-600 uppercase tracking-widest flex items-center gap-1 mt-1">
+                    <Music className="w-3 h-3" /> Audio Tersedia
+                  </span>
                 </div>
-                <ChevronRight className="text-amber-300 group-hover:text-amber-500 w-6 h-6" />
+                <div className="pr-4">
+                  <div className="w-10 h-10 bg-amber-100 rounded-full flex items-center justify-center text-amber-600 group-hover:bg-amber-500 group-hover:text-white transition-all">
+                    <ChevronRight className="w-6 h-6" />
+                  </div>
+                </div>
             </button>
             ))}
         </div>

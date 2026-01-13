@@ -21,6 +21,7 @@ export interface Doa {
   arabic: string;
   transliteration: string;
   translation: string;
+  imageUrl?: string;
 }
 
 export interface QuizQuestion {
